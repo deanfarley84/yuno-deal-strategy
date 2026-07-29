@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yuno × HealthBridge — Deal Strategy Dashboard</title>
+<style>
+  :root { color-scheme: light dark; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --grid: #e1e0d9; --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --s1: #2a78d6; --s2: #eb6834; --good: #006300; --crit: #d03b3b;
+    --navy: #16263f; --accent: #0e6655; --gold: #b7791f;
+    --band: rgba(42,120,214,0.10); --goldband: rgba(183,121,31,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:#1a1a19; --page:#0d0d0d; --ink:#fff; --ink-2:#c3c2b7;
+      --muted:#898781; --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,0.10);
+      --s1:#3987e5; --s2:#d95926; --good:#0ca30c; --crit:#e66767;
+      --navy:#1c3252; --accent:#17836e; --gold:#d99a3d;
+      --band:rgba(57,135,229,0.14); --goldband:rgba(217,154,61,0.12);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:#1a1a19; --page:#0d0d0d; --ink:#fff; --ink-2:#c3c2b7;
+    --muted:#898781; --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --good:#0ca30c; --crit:#e66767;
+    --navy:#1c3252; --accent:#17836e; --gold:#d99a3d;
+    --band:rgba(57,135,229,0.14); --goldband:rgba(217,154,61,0.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;}
+  .viz-root{background:var(--page);color:var(--ink);min-height:100vh;}
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 20px 64px;}
+  header.hero{background:linear-gradient(120deg,#16263f,#0e4a3c);color:#fff;border-radius:14px;padding:26px 28px 20px;margin-bottom:16px;position:relative;}
+  header.hero .kicker{color:#d9c58a;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
+  header.hero h1{font-size:25px;margin:6px 0 4px;}
+  header.hero p{color:#c9d4ce;font-size:13.5px;max-width:760px;}
+  .theme-btn{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;}
+  /* Tabs */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;position:sticky;top:0;background:var(--page);padding:10px 0;z-index:20;}
+  .tabs button{border:1px solid var(--border);background:var(--surface-1);color:var(--ink-2);border-radius:20px;padding:8px 16px;font-size:13px;cursor:pointer;font-weight:500;}
+  .tabs button.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600;}
+  .panel{display:none;} .panel.on{display:block;}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;}
+  .tile{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .tile .lbl{font-size:12px;color:var(--ink-2);}
+  .tile .val{font-size:25px;font-weight:600;margin-top:2px;}
+  .tile .sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;}
+  .card h2{font-size:16px;margin-bottom:2px;}
+  .card .sub{font-size:12.5px;color:var(--ink-2);margin-bottom:14px;}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--ink-2);margin-bottom:10px;flex-wrap:wrap;}
+  .legend .key{display:inline-flex;align-items:center;gap:6px;}
+  .legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  .row{display:grid;grid-template-columns:105px 1fr 120px;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px;}
+  .row .name{color:var(--ink-2);text-align:right;}
+  .barpair{position:relative;height:34px;}
+  .bar{position:absolute;height:13px;border-radius:0 4px 4px 0;transition:width .45s ease;cursor:pointer;}
+  .bar.cur{top:2px;background:var(--s1);}
+  .bar.tgt{top:19px;background:var(--s2);}
+  .bar:hover{filter:brightness(1.12);}
+  .row .gain{font-size:12px;color:var(--ink-2);}
+  .row .gain b{color:var(--ink);}
+  .axis{display:grid;grid-template-columns:105px 1fr 120px;gap:10px;font-size:10.5px;color:var(--muted);margin-top:4px;}
+  .axis .ticks{display:flex;justify-content:space-between;border-top:1px solid var(--baseline);padding-top:3px;}
+  .seg{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .seg button{border:1px solid var(--border);background:transparent;color:var(--ink-2);border-radius:8px;padding:6px 14px;font-size:12.5px;cursor:pointer;}
+  .seg button.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600;}
+  .rec-row{display:grid;grid-template-columns:105px 1fr 90px;gap:10px;align-items:center;margin-bottom:8px;font-size:12.5px;}
+  .rec-row .name{color:var(--ink-2);text-align:right;}
+  .rec-bar-wrap{height:16px;position:relative;}
+  .rec-bar{position:absolute;top:1px;height:13px;background:var(--s1);border-radius:0 4px 4px 0;transition:width .45s ease;cursor:pointer;}
+  .rec-bar:hover{filter:brightness(1.12);}
+  .rec-row .v{font-weight:600;font-variant-numeric:tabular-nums;}
+  .rec-total{display:flex;align-items:baseline;gap:10px;margin:12px 0 6px;}
+  .rec-total .n{font-size:34px;font-weight:650;}
+  .rec-total .c{font-size:12.5px;color:var(--ink-2);}
+  .calc{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media (max-width:760px){.calc{grid-template-columns:1fr;}}
+  .calc label{font-size:12.5px;color:var(--ink-2);display:block;margin-bottom:6px;}
+  .calc input[type=range]{width:100%;accent-color:var(--s1);}
+  .volread{font-size:14px;margin:4px 0 12px;}
+  .volread b{font-size:18px;}
+  .commit{display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0 4px;cursor:pointer;}
+  .tierline{font-size:12px;color:var(--muted);margin-top:6px;}
+  .fee-out{border-left:3px solid var(--gold);padding-left:16px;}
+  .fee-out .big{font-size:36px;font-weight:650;}
+  .fee-out .u{font-size:13px;color:var(--ink-2);}
+  .fee-rows{margin-top:10px;font-size:13px;}
+  .fee-rows div{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--grid);}
+  .fee-rows div:last-child{border-bottom:none;}
+  .fee-rows .v{font-variant-numeric:tabular-nums;font-weight:600;}
+  .roi-band{margin-top:14px;background:var(--band);border-radius:10px;padding:12px 16px;font-size:13px;}
+  .roi-band b{font-size:19px;}
+  .note{font-size:11.5px;color:var(--muted);margin-top:12px;}
+  /* Stakeholders */
+  .stake{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;}
+  .sk{border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;background:var(--surface-1);}
+  .sk:hover{border-color:var(--accent);transform:translateY(-1px);}
+  .sk.sel{border-color:var(--accent);border-width:2px;padding:15px;}
+  .sk h3{font-size:15px;}
+  .sk .role{font-size:11.5px;color:var(--gold);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
+  .sk .need{font-size:12.5px;color:var(--ink-2);margin-top:6px;}
+  .detail{border:1px solid var(--accent);border-radius:12px;padding:22px;margin-top:14px;background:var(--surface-1);display:none;}
+  .detail.on{display:block;}
+  .detail h3{font-size:17px;}
+  .detail .role{font-size:12px;color:var(--gold);font-weight:700;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;}
+  .fourgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px;}
+  .fg{background:var(--band);border-radius:10px;padding:12px;font-size:12.5px;}
+  .fg .t{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin-bottom:4px;}
+  .quote{border-left:3px solid var(--gold);padding:8px 14px;margin:10px 0;font-style:italic;font-size:13px;color:var(--ink-2);background:var(--goldband);border-radius:0 8px 8px 0;}
+  .quote b{color:var(--ink);font-style:normal;font-size:11px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px;}
+  .obj{border:1px solid var(--grid);border-radius:10px;margin-top:10px;overflow:hidden;}
+  .obj summary{padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;background:var(--goldband);list-style:none;display:flex;gap:8px;align-items:center;}
+  .obj summary::before{content:"▸";transition:transform .2s;}
+  .obj[open] summary::before{transform:rotate(90deg);}
+  .obj .resp{padding:12px 16px;font-size:13px;line-height:1.55;}
+  .obj .resp .tag{font-size:10.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;}
+  .vh{font-size:13px;margin-top:12px;}
+  .vh b{color:var(--accent);}
+  /* Competitors */
+  .comp{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:16px;}
+  .cc{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface-1);}
+  .cc.win{border-color:var(--accent);border-width:2px;padding:15px;}
+  .cc h3{font-size:15px;display:flex;align-items:center;gap:8px;}
+  .cc .type{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px;}
+  .cc .type.acq{color:var(--crit);} .cc .type.neu{color:var(--good);}
+  .cc ul{list-style:none;font-size:12.5px;color:var(--ink-2);}
+  .cc li{padding:4px 0;border-bottom:1px solid var(--grid);}
+  .cc li:last-child{border:none;}
+  .cc li b{color:var(--ink);}
+  .wedge{background:var(--band);border-radius:10px;padding:14px 18px;font-size:13.5px;margin-top:6px;}
+  /* Pain points */
+  .pain{border:1px solid var(--grid);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+  .pain summary{padding:13px 16px;cursor:pointer;list-style:none;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-size:13.5px;font-weight:600;}
+  .pain summary::before{content:"▸";}
+  .pain[open] summary::before{content:"▾";}
+  .pain summary .cost{font-size:12px;color:var(--crit);font-weight:700;}
+  .pain .body{padding:0 16px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  @media (max-width:760px){.pain .body{grid-template-columns:1fr;}}
+  .pain .cell{font-size:12.5px;background:var(--band);border-radius:8px;padding:10px;}
+  .pain .cell.o{background:var(--goldband);}
+  .pain .cell .t{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin-bottom:4px;}
+  .tl{position:relative;margin-left:8px;padding-left:22px;border-left:2px solid var(--grid);}
+  .tl .ph{position:relative;padding-bottom:14px;}
+  .tl .ph::before{content:"";position:absolute;left:-29px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--s1);border:2px solid var(--surface-1);}
+  .tl .d{font-size:11.5px;font-weight:700;color:var(--gold);}
+  .tl .m{font-size:13px;}
+  .tl .x{font-size:11.5px;color:var(--muted);}
+  table.tv{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px;}
+  table.tv th{text-align:left;color:var(--ink-2);font-weight:600;border-bottom:1px solid var(--baseline);padding:6px 8px;}
+  table.tv td{padding:6px 8px;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums;}
+  details.tblv summary{font-size:12px;color:var(--ink-2);cursor:pointer;margin-top:10px;}
+  .tooltip{position:fixed;pointer-events:none;background:var(--surface-1);border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,.15);border-radius:8px;padding:8px 12px;font-size:12px;z-index:50;display:none;}
+  .tooltip .tv1{font-weight:700;font-size:13px;}
+  .tooltip .tv2{color:var(--ink-2);}
+  footer{font-size:11px;color:var(--muted);text-align:center;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="viz-root">
+<div class="wrap">
+
+<header class="hero">
+  <button class="theme-btn" id="themeBtn">◐ Theme</button>
+  <div class="kicker">Yuno × HealthBridge Global · Deal Strategy Dashboard</div>
+  <h1>Recovering the revenue their stack is leaking</h1>
+  <p>$420M TPV healthcare SaaS · 14 countries · 72% blended approval · PayU expires in 89 days. Yuno is the agnostic orchestration layer above their existing providers — routing on their terms, quoting only its own platform fee.</p>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-p="overview" class="on">Overview</button>
+  <button data-p="stake">Stakeholders & Objections</button>
+  <button data-p="pricing">Pricing</button>
+  <button data-p="comp">Competitor Analysis</button>
+  <button data-p="pain">Pain Points & Win Strategy</button>
+</nav>
+
+<!-- ============ OVERVIEW ============ -->
+<section class="panel on" id="p-overview">
+  <div class="tiles">
+    <div class="tile"><div class="lbl">Annual TPV</div><div class="val">$420M</div><div class="sub">14 countries, 4.22M txns</div></div>
+    <div class="tile"><div class="lbl">Blended approval</div><div class="val">72%</div><div class="sub">28 in 100 patient payments fail</div></div>
+    <div class="tile"><div class="lbl">Modelled recovery</div><div class="val">$15.6M<span style="font-size:14px;color:var(--muted)">/yr</span></div><div class="sub">13% under Sofia's own estimate</div></div>
+    <div class="tile"><div class="lbl">Yuno all-in fee</div><div class="val">~€120K<span style="font-size:14px;color:var(--muted)">/yr</span></div><div class="sub">the only number Yuno quotes</div></div>
+    <div class="tile"><div class="lbl">Deal clock</div><div class="val">89 days</div><div class="sub">to PayU contract expiry</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Approval rates — today vs committed target, by region</h2>
+    <div class="sub">Targets sit deliberately beneath both the published benchmark bands and HealthBridge's own historical highs. Hover any bar for detail.</div>
+    <div class="legend">
+      <span class="key"><span class="sw" style="background:var(--s1)"></span>Today</span>
+      <span class="key"><span class="sw" style="background:var(--s2)"></span>Committed target (with Yuno)</span>
+    </div>
+    <div id="apprChart"></div>
+    <div class="axis"><span></span><div class="ticks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div><span></span></div>
+    <details class="tblv"><summary>Table view</summary>
+      <table class="tv"><thead><tr><th>Region</th><th>Today</th><th>Target</th><th>Benchmark band</th><th>Own history</th></tr></thead><tbody id="apprTable"></tbody></table>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>Revenue recovery model</h2>
+    <div class="sub">Method: approved volume ÷ approval rate = attempted volume; attempted × pp lift = recovered. Switch scenario to stress-test.</div>
+    <div class="seg" id="scenSeg">
+      <button data-s="cons">Conservative</button>
+      <button data-s="base" class="on">Base</button>
+      <button data-s="up">Upside</button>
+    </div>
+    <div class="rec-total"><span class="n" id="recTotal">$15.6M</span><span class="c" id="recCap"></span></div>
+    <div id="recChart"></div>
+    <details class="tblv"><summary>Table view</summary>
+      <table class="tv"><thead><tr><th>Region</th><th>Approved vol.</th><th>Rate</th><th>Attempted vol.</th><th>Lift</th><th>Recovered/yr</th></tr></thead><tbody id="recTable"></tbody></table>
+    </details>
+  </div>
+</section>
+
+<!-- ============ STAKEHOLDERS ============ -->
+<section class="panel" id="p-stake">
+  <div class="card">
+    <h2>Four people, four different sales</h2>
+    <div class="sub">Click a name for the full read: four-layer analysis, tactical empathy scripting, their value proposition, and the objections they'll raise — with prepared responses aligned to their pain.</div>
+    <div class="stake" id="stakeCards"></div>
+    <div class="detail" id="stakeDetail"></div>
+  </div>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section class="panel" id="p-pricing">
+  <div class="card">
+    <h2>Yuno pricing calculator — the only pricing in this deal that is Yuno's</h2>
+    <div class="sub">Fixed euro-cents per transaction plus a flat €3,000/month platform fee. Never a percentage of volume. Acquiring rates are negotiated by HealthBridge directly with providers — Yuno does not quote them.</div>
+    <div class="calc">
+      <div>
+        <label for="vol">Monthly orchestrated transactions</label>
+        <input type="range" id="vol" min="50" max="1000" step="5" value="274">
+        <div class="volread"><b id="volRead">274k</b> txns/month <span id="hbMark" style="color:var(--gold);font-weight:600"></span></div>
+        <label class="commit"><input type="checkbox" id="commit" checked> Minimum monthly volume commitment (−15% on orchestration)</label>
+        <div class="tierline" id="tierLine"></div>
+        <table class="tv"><thead><tr><th>Tier</th><th>Monthly txns</th><th>Orchestration</th><th>Tokens</th><th>3DS</th></tr></thead>
+        <tbody id="tierTable"></tbody></table>
+      </div>
+      <div class="fee-out">
+        <div class="u">Yuno all-in annual fee</div>
+        <div class="big" id="feeBig">€119,895</div>
+        <div class="fee-rows">
+          <div><span>Orchestration (<span id="rateRead">€0.030</span>/txn<span id="discRead"> − 15%</span>)</span><span class="v" id="orchFee">€83,895</span></div>
+          <div><span>Platform fee (€3,000 × 12)</span><span class="v">€36,000</span></div>
+        </div>
+        <div class="roi-band" id="roiBand"></div>
+        <div class="note">Universal tokens and 3DS priced per tier, billed on usage. All rates illustrative pending Yuno commercial confirmation.</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Where the customer economics actually move</h2>
+    <div class="sub">Yuno's fee is deliberately small next to the value levers it unlocks — none of which Yuno prices or earns against.</div>
+    <table class="tv"><thead><tr><th></th><th>Annual figure</th><th>Whose number it is</th></tr></thead><tbody>
+      <tr><td><b>Yuno total fee</b> (Tier 2, commitment)</td><td>~€120K</td><td>Yuno's — quoted, fixed, disclosed</td></tr>
+      <tr><td>Modelled recovered payment volume</td><td>$15.6M</td><td>Theirs — built from their data, conservative</td></tr>
+      <tr><td>Acquiring-cost improvement (local processing + routing competition)</td><td>Negotiated by them, directly with providers</td><td>Theirs — we enable it, we don't price it</td></tr>
+      <tr><td>Operational & speed-to-market value</td><td>$0.4M–$0.65M</td><td>Theirs — freed FTE time + pulled-forward methods</td></tr>
+      <tr><td>Chargeback fees avoided ($15–25/dispute)</td><td>Sized in discovery</td><td>Theirs — 3DS/chargeback strategy in platform fee</td></tr>
+    </tbody></table>
+    <div class="roi-band" style="margin-top:16px">Read the first two rows together: <b>≈120:1</b> — the whole commercial case in one ratio. A cost utility asks you to trust it. A revenue stream shows you the number.</div>
+  </div>
+</section>
+
+<!-- ============ COMPETITORS ============ -->
+<section class="panel" id="p-comp">
+  <div class="card">
+    <h2>The field — and the structural split that decides this deal</h2>
+    <div class="sub">Two kinds of "orchestration" exist: acquirers routing volume to themselves, and neutral layers with nothing to earn from the routing decision. The distinction matters more than any feature list.</div>
+    <div class="comp" id="compCards"></div>
+    <div class="wedge"><b>The wedge, used calmly and only once:</b> "Whoever routes your transactions — ask what they earn when the answer is 'to ourselves'." Adyen is credible, which is exactly why the conflict-of-interest point lands harder when made without cynicism. Never disparage them; refuse their battlefield instead.</div>
+  </div>
+  <div class="card">
+    <h2>Win strategy vs Adyen — refuse their battlefield</h2>
+    <div class="sub">Adyen wants this decided on brand, headline rate and vendor count. We move it to approval-rate economics, routing neutrality and migration risk.</div>
+    <table class="tv"><thead><tr><th>Battleground</th><th>Adyen's story</th><th>Our counter</th></tr></thead><tbody>
+      <tr><td><b>Vendor count</b></td><td>"One vendor, one contract — consolidate"</td><td>Yuno abstracts providers behind one API — integration surfaces shrink while commercial optionality grows. Consolidation = captivity with better branding.</td></tr>
+      <tr><td><b>Price</b></td><td>2.8% + $0.25 headline blended rate</td><td>We don't submit a rate card — we don't have one. Fixed cents + flat fee, never a % of volume. Reframe to total economic value: the $18M leak beats any rate delta.</td></tr>
+      <tr><td><b>Routing</b></td><td>"We do orchestration too"</td><td>Routing volume to yourself isn't orchestration, it's distribution. Yuno earns nothing from the routing outcome.</td></tr>
+      <tr><td><b>Migration</b></td><td>Unstated: full rip-and-replace of PayU AND Stripe</td><td>Phase 1 sits alongside the existing stack — nothing removed, routing live above it. The six-month project Marcus fears is Adyen's path, not ours.</td></tr>
+      <tr><td><b>Champion</b></td><td>Marcus (engineering) loves the simplification story</td><td>Reach David with the leakage-as-cost frame before Adyen's rate anchors him; give Marcus a sandbox, not a deck.</td></tr>
+    </tbody></table>
+  </div>
+  <div class="card">
+    <h2>Top three loss risks — and the pre-handles</h2>
+    <table class="tv"><thead><tr><th>Risk</th><th>Signal to watch</th><th>Mitigation</th></tr></thead><tbody>
+      <tr><td>Marcus drives an Adyen recommendation before we reach the table</td><td>Technical evaluation scheduled without Yuno invited</td><td>Week-one SE session; sandbox before commercials — a live-code evaluation, not a deck war</td></tr>
+      <tr><td>David anchors on lowest headline acquiring rate</td><td>"Just send your rates" procurement requests</td><td>Leakage-as-cost model in front of him by day 21; never submit a rate card</td></tr>
+      <tr><td>PayU defensive discount muddies the water late</td><td>Renewal offer suddenly improves near day 60</td><td>Concede it early with Sofia: PayU will cut price, and a discount fixes nothing about 68% approval in Brazil</td></tr>
+    </tbody></table>
+  </div>
+</section>
+
+<!-- ============ PAIN POINTS ============ -->
+<section class="panel" id="p-pain">
+  <div class="card">
+    <h2>Pain → solution → outcome</h2>
+    <div class="sub">Every pain is customer-stated, from discovery. The frame: here is what is broken, here is why it matters, here is the simplest way to fix it. Click each to expand.</div>
+    <div id="painList"></div>
+  </div>
+  <div class="card">
+    <h2>The conflict that decides the deal — and how we refuse it</h2>
+    <div class="sub">Sofia is measured on revenue recovery. David demands 20% cost reduction. Most sellers pick a side.</div>
+    <div class="wedge">The winning move is to refuse the trade-off: <b>the $18M decline leakage is itself the largest cost line in HealthBridge's payment stack</b> — bigger than the whole $14.8M processing bill. Framed that way, Sofia's agenda becomes the fastest route to David's number, and the two mandates stop competing. This reframe is the spine of the whole proposal.</div>
+  </div>
+  <div class="card">
+    <h2>90-day plan — close before the renewal clock runs out</h2>
+    <div class="sub">Signature target day 60–75 leaves a two-week buffer before the day-89 PayU deadline.</div>
+    <div class="tl" id="timeline"></div>
+  </div>
+</section>
+
+<footer>Dean Farley · Yuno × HealthBridge deal package · Data: deal dossier + y.uno published results · Rates illustrative pending commercial sign-off</footer>
+</div>
+<div class="tooltip" id="tip"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s)=>document.querySelector(s);
+  const tip=$("#tip");
+  function showTip(e,lines){
+    tip.innerHTML="";
+    lines.forEach((l,i)=>{const d=document.createElement("div");d.className=i===0?"tv1":"tv2";d.textContent=l;tip.appendChild(d);});
+    tip.style.display="block";
+    tip.style.left=Math.min(e.clientX+14,window.innerWidth-230)+"px";
+    tip.style.top=(e.clientY+14)+"px";
+  }
+  function hideTip(){tip.style.display="none";}
+
+  $("#themeBtn").addEventListener("click",()=>{
+    const r=document.documentElement, cur=r.getAttribute("data-theme");
+    const dark=window.matchMedia("(prefers-color-scheme: dark)").matches;
+    r.setAttribute("data-theme",cur?(cur==="dark"?"light":"dark"):(dark?"light":"dark"));
+  });
+
+  // Tabs
+  document.querySelectorAll("#tabs button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("on"));
+      document.querySelectorAll(".panel").forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");
+      document.getElementById("p-"+b.dataset.p).classList.add("on");
+      window.scrollTo({top:0,behavior:"smooth"});
+    });
+  });
+
+  // ---- Approval chart ----
+  const regions=[
+    {n:"US",cur:86,tgt:87,band:"88–93% domestic",hist:"—",vol:"$98M"},
+    {n:"EU",cur:81,tgt:82,band:"85–90% domestic",hist:"—",vol:"$54M"},
+    {n:"Mexico",cur:71,tgt:74,band:"70–85% LATAM",hist:"76% six months ago",vol:"$72M"},
+    {n:"Brazil",cur:68,tgt:72,band:"70–85% LATAM",hist:"74% six months ago",vol:"$130M"},
+    {n:"Colombia",cur:66,tgt:69,band:"70–85% LATAM",hist:"—",vol:"$34M"},
+    {n:"SE Asia",cur:63,tgt:66,band:"75–88% APAC",hist:"—",vol:"$22M"},
+    {n:"Africa",cur:58,tgt:61,band:"no reliable band",hist:"—",vol:"$10M"}
+  ];
+  const ac=$("#apprChart"),at=$("#apprTable");
+  regions.forEach(r=>{
+    const row=document.createElement("div");row.className="row";
+    const nm=document.createElement("div");nm.className="name";nm.textContent=r.n;
+    const bp=document.createElement("div");bp.className="barpair";
+    const b1=document.createElement("div");b1.className="bar cur";b1.style.width=r.cur+"%";
+    const b2=document.createElement("div");b2.className="bar tgt";b2.style.width=r.tgt+"%";
+    [[b1,"Today",r.cur],[b2,"Committed target",r.tgt]].forEach(([el,lbl,v])=>{
+      el.setAttribute("tabindex","0");
+      el.addEventListener("pointermove",(e)=>showTip(e,[v+"% — "+lbl,r.n+" · "+r.vol+" approved vol.","Benchmark: "+r.band+(r.hist!=="—"?" · Own history: "+r.hist:"")]));
+      el.addEventListener("pointerleave",hideTip);
+      el.addEventListener("focus",()=>{const rc=el.getBoundingClientRect();showTip({clientX:rc.right,clientY:rc.top},[v+"% — "+lbl,r.n]);});
+      el.addEventListener("blur",hideTip);
+    });
+    bp.appendChild(b1);bp.appendChild(b2);
+    const g=document.createElement("div");g.className="gain";
+    g.innerHTML="<b>+"+(r.tgt-r.cur)+"pp</b> → "+r.tgt+"%";
+    row.appendChild(nm);row.appendChild(bp);row.appendChild(g);
+    ac.appendChild(row);
+    const tr=document.createElement("tr");
+    [r.n,r.cur+"%",r.tgt+"%",r.band,r.hist].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td);});
+    at.appendChild(tr);
+  });
+
+  // ---- Recovery ----
+  const rec=[
+    {n:"Brazil",app:130,rate:68,lift:4,base:7.65},
+    {n:"Mexico",app:72,rate:71,lift:3,base:3.04},
+    {n:"Colombia",app:34,rate:66,lift:3,base:1.55},
+    {n:"SE Asia",app:22,rate:63,lift:3,base:1.05},
+    {n:"Africa",app:10,rate:58,lift:3,base:0.52},
+    {n:"US",app:98,rate:86,lift:1,base:1.14},
+    {n:"EU",app:54,rate:81,lift:1,base:0.67}
+  ];
+  const scen={cons:{f:0.6,cap:"lifts land at ~60% of target — execution disappoints everywhere at once"},
+              base:{f:1,cap:"region-by-region lifts anchored to their history and published Yuno results"},
+              up:{f:1.155,cap:"Sofia's own $18M estimate — regions close fully to benchmark bands"}};
+  let curScen="base";
+  const rc2=$("#recChart"),rt=$("#recTable");
+  const fmtM=(v)=>"$"+v.toFixed(2)+"M";
+  function renderRec(){
+    const f=scen[curScen].f;
+    rc2.innerHTML="";rt.innerHTML="";
+    let tot=0;const max=8.9;
+    rec.forEach(r=>{
+      const v=r.base*f;tot+=v;
+      const row=document.createElement("div");row.className="rec-row";
+      const nm=document.createElement("div");nm.className="name";nm.textContent=r.n;
+      const w=document.createElement("div");w.className="rec-bar-wrap";
+      const b=document.createElement("div");b.className="rec-bar";b.style.width=Math.max(1.5,(v/max*100))+"%";
+      b.setAttribute("tabindex","0");
+      const att=(r.app/(r.rate/100));
+      b.addEventListener("pointermove",(e)=>showTip(e,[fmtM(v)+" recovered / yr",r.n+" · +"+r.lift+"pp lift ("+curScen+")","Attempted $"+att.toFixed(1)+"M · approved $"+r.app+"M @ "+r.rate+"%"]));
+      b.addEventListener("pointerleave",hideTip);
+      b.addEventListener("focus",()=>{const rct=b.getBoundingClientRect();showTip({clientX:rct.right,clientY:rct.top},[fmtM(v),r.n]);});
+      b.addEventListener("blur",hideTip);
+      w.appendChild(b);
+      const val=document.createElement("div");val.className="v";val.textContent=fmtM(v);
+      row.appendChild(nm);row.appendChild(w);row.appendChild(val);
+      rc2.appendChild(row);
+      const tr=document.createElement("tr");
+      [r.n,"$"+r.app+"M",r.rate+"%","$"+att.toFixed(1)+"M","+"+r.lift+"pp",fmtM(v)].forEach(x=>{const td=document.createElement("td");td.textContent=x;tr.appendChild(td);});
+      rt.appendChild(tr);
+    });
+    $("#recTotal").textContent="$"+tot.toFixed(1)+"M";
+    $("#recCap").textContent=scen[curScen].cap;
+  }
+  document.querySelectorAll("#scenSeg button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      document.querySelectorAll("#scenSeg button").forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");curScen=b.dataset.s;renderRec();
+    });
+  });
+  renderRec();
+
+  // ---- Pricing calc ----
+  const tiers=[
+    {name:"Tier 1",max:250,orch:0.035,tok:0.030,tds:0.025,lbl:"up to 250k"},
+    {name:"Tier 2",max:500,orch:0.030,tok:0.025,tds:0.020,lbl:"250k–500k"},
+    {name:"Tier 3",max:1000,orch:0.025,tok:0.020,tds:0.015,lbl:"500k–1M"}
+  ];
+  const tt=$("#tierTable");
+  tiers.forEach(t=>{
+    const tr=document.createElement("tr");tr.id="tier-"+t.name.replace(" ","");
+    [t.name,t.lbl,"€"+t.orch.toFixed(3),"€"+t.tok.toFixed(3),"€"+t.tds.toFixed(3)].forEach(x=>{const td=document.createElement("td");td.textContent=x;tr.appendChild(td);});
+    tt.appendChild(tr);
+  });
+  const trC=document.createElement("tr");
+  ["Tier 4","1M+","Custom","Custom","Custom"].forEach(x=>{const td=document.createElement("td");td.textContent=x;trC.appendChild(td);});
+  tt.appendChild(trC);
+  const euro=(n)=>"€"+Math.round(n).toLocaleString("en-GB");
+  function calc(){
+    const mk=parseInt($("#vol").value,10);
+    const commit=$("#commit").checked;
+    const tier=tiers.find(t=>mk<=t.max)||tiers[2];
+    const orch=mk*1000*12*tier.orch*(commit?0.85:1);
+    const total=orch+36000;
+    $("#volRead").textContent=mk+"k";
+    $("#hbMark").textContent=(mk>=270&&mk<=278)?"◄ HealthBridge today":"";
+    $("#rateRead").textContent="€"+tier.orch.toFixed(3);
+    $("#discRead").textContent=commit?" − 15%":"";
+    $("#orchFee").textContent=euro(orch);
+    $("#feeBig").textContent=euro(total);
+    $("#tierLine").textContent=tier.name+" pricing applies ("+tier.lbl+" txns/month). Move up in volume, move down in unit price.";
+    tiers.forEach(t=>{const el=document.getElementById("tier-"+t.name.replace(" ",""));
+      el.style.background=(t===tier)?"var(--band)":"";el.style.fontWeight=(t===tier)?"600":"";});
+    const roi=15600000/(total*1.08);
+    $("#roiBand").innerHTML=(mk>=270&&mk<=278)
+      ?"At HealthBridge's volume: <b>≈"+Math.round(roi)+":1</b> — every €1 of fee returns ~$"+Math.round(roi)+" of modelled recovered volume (at ~$1.08/€). The annual fee is covered by the first ~3 days of a typical month's recovery."
+      :"Fee shown for "+mk+"k txns/month. Recovery modelling in this deal is fixed to HealthBridge's actual volume (274k/mo): $15.6M/yr against ~€120K ≈ <b>120:1</b>.";
+  }
+  $("#vol").addEventListener("input",calc);
+  $("#commit").addEventListener("change",calc);
+  calc();
+
+  // ---- Stakeholders ----
+  const ppl=[
+    {n:"Sofia Mendez",r:"VP Payments · The Champion",need:"78% approval globally, 8 local methods in 2024, vendor consolidation. Measured on revenue recovery.",
+     four:{stated:"Get us to 78% approval and launch four local methods in Q1 — or are you going to take 6 months like PayU?",
+           incentive:"14 months into a 'modernise the stack' mandate. Needs a visible, numbers-backed win this year.",
+           pressure:"David's cost bar squeezing her roadmap; Marcus's Adyen preference undermining her vendor authority.",
+           exit:"A decision she can defend to David and Jessica as financially rigorous — not her pet project."},
+     label:"It sounds like you've already done the maths on what these declines cost you — what's been missing is a partner who commits to numbers, not roadmaps.",
+     q:"If we hit 72% in Brazil by end of Q1, what does that do for your conversation with David?",
+     vp:"Cascading + smart routing over her existing providers from day one; pre-built local connectivity in her exact markets (PIX, Boleto, PSE, GCash, Maya, M-Pesa); a consolidation story that starts without a rip-and-replace. Proof: inDrive 90% approval, Reserva +4pp in 3 months, Livelo 50% failed-txn recovery.",
+     objs:[{o:"Yuno is a lot younger than Adyen. How do I know you'll still be around in 3 years?",
+            pain:"Aligned to her pain: she's putting her name on this decision with 14 months' tenure.",
+            resp:"That's a fair question, and if I were putting my name on this decision I'd ask it too. Yuno's Series A closed in 2024 led by DST Global with a16z, Tiger Global, Kaszek and Monashees returning from seed — early investors doubling down — and the team built payments at Rappi, so your LATAM complexity is our founding DNA, not an expansion market. Structurally, we never hold your funds and hold no acquiring licences, so you're not exposed to our balance sheet the way you are to a PSP's. If you ever walked away, your acquiring relationships walk with you — that's the safest architecture on your shortlist, not the riskiest."}]},
+    {n:"Marcus Chen",r:"Head of Engineering · The Objection to Dissolve",need:"Protect a 45-person team stretched across 15+ integrations. API reliability. Currently Adyen's internal advocate.",
+     four:{stated:"Sofia wants to add Yuno on top of PayU and Stripe? That's three vendors instead of one. Why not just Adyen?",
+           incentive:"Bandwidth protection — and not owning a failed migration on his roadmap.",
+           pressure:"Leadership expects SE Asia and Africa expansion without his roadmap moving.",
+           exit:"A technical decision he can defend to his own team — with a proof point before a signature."},
+     label:"It seems like the last thing your team needs is another integration sold by someone who disappears when the webhooks start failing.",
+     q:"How are you planning to add PSE, GCash and M-Pesa on the current stack without it landing on your roadmap?",
+     vp:"Engineering effort avoided, not added: one API and one webhook contract abstracts every provider; cascading, smart routing and Card Account Updater are shipped products his team configures, not builds. Stripe untouched in Phase 1. Sandbox before signature; sessions run by Solutions Engineering, not sales.",
+     objs:[{o:"Why add Yuno on top of our existing PSPs? Why not just consolidate everything into Adyen?",
+            pain:"Aligned to his pain: vendor sprawl and integration surface area.",
+            resp:"It sounds like the real concern is integration surface area, not vendor count on a slide — and that's the right concern. Yuno doesn't add a provider, it abstracts them: your team integrates one API, and PayU, Stripe and any future provider become configuration, not code. Consolidating into Adyen makes the router and the acquirer the same company — when Adyen decides where a transaction goes, it's also deciding what Adyen earns, and routing volume to yourself isn't orchestration, it's distribution. I'd rather your engineers pressure-test that in a sandbox than take my word for it."},
+           {o:"Our engineering team is slammed. We can't take on a 6-month integration project right now.",
+            pain:"Aligned to his pain: a stretched team and a busy product quarter.",
+            resp:"It sounds like you've been through a migration that was sold as easy and wasn't — PayU took seven months to deliver one payment method, so scepticism is earned. Phase 1 connects Yuno alongside PayU and Stripe exactly as they run today: nothing ripped out, routing and fallback live above them, provider connectivity maintained by us. The six-month rip-and-replace in your busiest quarter is the Adyen consolidation path, not this one. Let's scope sandbox-to-production with your team before anyone signs — I'd rather lose a week now than slip a month later."}]},
+    {n:"David Park",r:"CFO · Sold Separately",need:"Minimum 20% payment-cost reduction. IRR, payback period, board-defensible ROI. 18-month profitability target.",
+     four:{stated:"Our priority is cost reduction, not approval rate optimisation. I want at least 20% cost savings.",
+           incentive:"The 18-month profitability target the board tracks. Payments is his largest controllable cost line.",
+           pressure:"Board scrutiny on the path to profitability; every cost line under the microscope.",
+           exit:"A payback case he can defend without becoming the executive who personally picked a payments vendor."},
+     label:"It sounds like payments has only ever been presented to you as a cost line to shrink — never as a revenue line that's leaking.",
+     q:"What happens to the profitability plan if approval rates keep sliding at the rate they did last half?",
+     vp:"The $18M decline leakage reframed as his largest payments cost — bigger than the entire $14.8M processing bill. One transparent platform fee (~€120K), never a % of volume. Cost-optimal routing and local processing let HealthBridge negotiate acquiring down directly. Card Account Updater protects recurring revenue he isn't currently pricing as payments risk at all.",
+     objs:[{o:"Your pricing looks similar to PayU's. How do we save money if we're adding an orchestration layer?",
+            pain:"Aligned to his pain: cost scrutiny and a 20% savings bar shaped by flat-rate pitches.",
+            resp:"It seems like the comparison you've been shown puts us in the same column as PayU — so let me correct the category first: Yuno has no acquiring rate. You negotiate acquiring directly with your providers; our fee is a fixed €0.03 per transaction plus €3,000 a month — around €120K a year with a commitment discount, never a percentage of your volume, no blended margin. By Sofia's own estimate you're losing $18M a year to declines — larger than your entire processing bill — and stopping that leak is precisely what the fee buys. The question for your board isn't 'which rate is lowest', it's 'which structure stops the leak'."}]},
+    {n:"Jessica Wu",r:"CEO · Held in Reserve",need:"Patient access and experience. Team focus. Emerging-market growth. Engages only if board-level.",
+     four:{stated:"(Not yet engaged — trusts Sofia and David.)",
+           incentive:"Mission: make healthcare accessible globally. Failed payments = failed patient experience.",
+           pressure:"Growth expectations in emerging markets without distracting engineering.",
+           exit:"Only involved if this escalates. One message: a failed payment is a failed point of access to care."},
+     label:"Every recovered decline is a patient who completed a payment for care — not a percentage point.",
+     q:"—",
+     vp:"This is an access project before it's a cost project. Approval-rate recovery is a direct extension of the company mission — measured, benchmarked, improving quarter on quarter.",
+     objs:[]}
+  ];
+  const sc=$("#stakeCards"),sd=$("#stakeDetail");
+  let selIdx=-1;
+  function renderDetail(i){
+    const p=ppl[i];sd.innerHTML="";
+    const role=document.createElement("div");role.className="role";role.textContent=p.r;
+    const h=document.createElement("h3");h.textContent=p.n;
+    sd.appendChild(role);sd.appendChild(h);
+    const fg=document.createElement("div");fg.className="fourgrid";fg.style.marginTop="12px";
+    [["Stated position",p.four.stated],["Actual incentive",p.four.incentive],["Pressure source",p.four.pressure],["The exit they need",p.four.exit]].forEach(([t,v])=>{
+      const c=document.createElement("div");c.className="fg";
+      const tt2=document.createElement("div");tt2.className="t";tt2.textContent=t;
+      const vv=document.createElement("div");vv.textContent=v;
+      c.appendChild(tt2);c.appendChild(vv);fg.appendChild(c);
+    });
+    sd.appendChild(fg);
+    const q1=document.createElement("div");q1.className="quote";
+    q1.innerHTML="<b>Tactical empathy — the label</b>";q1.appendChild(document.createTextNode("“"+p.label+"”"));
+    sd.appendChild(q1);
+    if(p.q!=="—"){
+      const q2=document.createElement("div");q2.className="quote";
+      q2.innerHTML="<b>The calibrated question</b>";q2.appendChild(document.createTextNode("“"+p.q+"”"));
+      sd.appendChild(q2);
+    }
+    const vh=document.createElement("div");vh.className="vh";
+    vh.innerHTML="<b>Their value proposition:</b> ";vh.appendChild(document.createTextNode(p.vp));
+    sd.appendChild(vh);
+    if(p.objs.length){
+      const oh=document.createElement("div");oh.style.cssText="font-weight:700;font-size:13px;margin-top:16px;";
+      oh.textContent="Objections this person will raise — with prepared responses";
+      sd.appendChild(oh);
+      p.objs.forEach(o=>{
+        const det=document.createElement("details");det.className="obj";
+        const sum=document.createElement("summary");sum.textContent="“"+o.o+"”";
+        const resp=document.createElement("div");resp.className="resp";
+        const tag=document.createElement("span");tag.className="tag";tag.textContent=o.pain;
+        resp.appendChild(tag);resp.appendChild(document.createTextNode(o.resp));
+        det.appendChild(sum);det.appendChild(resp);sd.appendChild(det);
+      });
+    }
+    sd.classList.add("on");
+  }
+  ppl.forEach((p,i)=>{
+    const d=document.createElement("div");d.className="sk";d.setAttribute("tabindex","0");
+    const r=document.createElement("div");r.className="role";r.textContent=p.r;
+    const h=document.createElement("h3");h.textContent=p.n;
+    const nd=document.createElement("div");nd.className="need";nd.textContent=p.need;
+    d.appendChild(r);d.appendChild(h);d.appendChild(nd);
+    const sel=()=>{
+      document.querySelectorAll(".sk").forEach(x=>x.classList.remove("sel"));
+      if(selIdx===i){selIdx=-1;sd.classList.remove("on");return;}
+      selIdx=i;d.classList.add("sel");renderDetail(i);
+      sd.scrollIntoView({behavior:"smooth",block:"nearest"});
+    };
+    d.addEventListener("click",sel);
+    d.addEventListener("keydown",(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();sel();}});
+    sc.appendChild(d);
+  });
+
+  // ---- Competitors ----
+  const comps=[
+    {n:"PayU (incumbent)",t:"Acquirer / PSP",cls:"acq",rows:[
+      ["Status","Renewal offered: 3.2% + $0.28 (their quote)"],
+      ["Routing incentive","Earns MDR wherever it routes — to itself"],
+      ["Weakness","Brazil approval fell 74%→68% on their watch; 7 months to launch PIX; 'it's the issuers' as an answer"],
+      ["Threat","Late defensive discount near day 60 — pre-handle it with Sofia now"]]},
+    {n:"Adyen (active threat)",t:"Acquirer/PSP + own orchestration",cls:"acq",rows:[
+      ["Status","Pitching full consolidation; champion is Marcus"],
+      ["Routing incentive","Router and beneficiary of the same decision"],
+      ["Strength","Brand (Uber, Netflix, Spotify), scale, one-vendor story"],
+      ["Weakness","Consolidation = dual rip-and-replace of PayU AND Stripe in a busy quarter; routing to yourself isn't orchestration"]]},
+    {n:"Spreedly / Primer / IXOPAY",t:"Neutral orchestration (context)",cls:"neu",rows:[
+      ["Status","Not in this deal — noted for completeness"],
+      ["Routing incentive","None — genuinely neutral, like Yuno"],
+      ["Why Yuno anyway","None carry Yuno's published LATAM approval-rate results in HealthBridge's exact markets"]]},
+    {n:"Yuno (us)",t:"Neutral orchestration — not an acquirer",cls:"neu",win:true,rows:[
+      ["Structure","No acquiring licences, never touches settlement, earns nothing from routing outcomes"],
+      ["Fit","56% of TPV in Brazil/Mexico/Colombia — exactly where inDrive (90%), Reserva (+4pp), Livelo (50% recovery) were delivered"],
+      ["Pricing","Fixed cents + flat fee, never a % of volume — the only pricing we quote"],
+      ["Path","Phase 1 alongside the existing stack; nothing removed; sandbox before signature"]]}
+  ];
+  const cc=$("#compCards");
+  comps.forEach(c=>{
+    const d=document.createElement("div");d.className="cc"+(c.win?" win":"");
+    const h=document.createElement("h3");h.textContent=c.n;
+    const t=document.createElement("div");t.className="type "+c.cls;t.textContent=c.t;
+    d.appendChild(h);d.appendChild(t);
+    const ul=document.createElement("ul");
+    c.rows.forEach(([k,v])=>{
+      const li=document.createElement("li");
+      const b=document.createElement("b");b.textContent=k+": ";
+      li.appendChild(b);li.appendChild(document.createTextNode(v));ul.appendChild(li);
+    });
+    d.appendChild(ul);cc.appendChild(d);
+  });
+
+  // ---- Pain points ----
+  const pains=[
+    {p:"Declining approval rates",cost:"$18M/yr leakage (their estimate)",
+     why:"Brazil 74%→68%, Mexico 76%→71% in six months. PayU's answer: 'it's the issuers, nothing we can do.' 28 in 100 legitimate patient payments fail.",
+     sol:"Smart routing to the best-approving provider per transaction; cascading retries a decline with an alternative provider in milliseconds; local processing where issuers trust domestic transactions more.",
+     out:"$15.6M/yr modelled recovery (conservative vs their own $18M). Brazil 68%→72% committed inside Q1 — benchmarked against Yuno's published Reserva result."},
+    {p:"Slow payment-method rollout",cost:"7 months for one method",
+     why:"PayU took 7 months to enable PIX; quoted 4–6 months per method for Boleto, PSE, GCash, Maya, M-Pesa. Sofia's 2024 OKR is 8 new local methods.",
+     sol:"All five planned methods are existing Yuno connections — configuration, not integration. Patients pay how they actually pay, in-country, in local currency.",
+     out:"Q1 rollout becomes real; ~a quarter of approval-rate benefit pulled forward; Sofia's OKR delivered on rails that already exist."},
+    {p:"Cross-border cost drag",cost:"Non-domestic interchange + FX on most LATAM volume",
+     why:"Brazilian patients' cards processed through PayU's European entity — cross-border fees and lower issuer trust on domestic patients' payments.",
+     sol:"In-country processing options via Yuno's existing platform connections; per-route cost visibility; HealthBridge negotiates each acquiring relationship directly, from strength.",
+     out:"Cross-border premium removed where routing goes domestic. Yuno prices none of it — the savings are theirs to negotiate and keep."},
+    {p:"No routing control or failover",cost:"100% captive volume",
+     why:"All PayU traffic goes to PayU, all Stripe traffic to Stripe. No failover, no A/B testing, no competitive tension. A decline is simply a lost payment.",
+     sol:"An agnostic layer above the stack: routing rules they control, automatic fallback, provider performance visible on one dashboard the day it slips.",
+     out:"Providers compete for volume transaction by transaction. The power dynamic inverts: payments becomes a revenue stream they manage, not a cost utility they tolerate."},
+    {p:"Failed recurring payments",cost:"Invisible involuntary churn",
+     why:"Patient membership fees fail silently when cards expire or get reissued. Nobody currently prices this as payments risk.",
+     sol:"Card Account Updater refreshes stored Visa/Mastercard credentials automatically; 3DS applied only where risk or regulation demands it, exemptions keep trusted transactions frictionless.",
+     out:"Recurring revenue protected; chargeback ratios held below scheme thresholds; each prevented dispute saves the transaction and the $15–25 fee."},
+    {p:"Poor developer experience",cost:"45 engineers stretched across 15+ integrations",
+     why:"Marcus's team complains about PayU's API documentation and webhook reliability. Every new provider or method lands on his roadmap.",
+     sol:"One API, one webhook contract; provider connections maintained by Yuno; sandbox access before any signature; sessions run by Solutions Engineering.",
+     out:"Integration surface shrinks while commercial optionality grows. The next market entry is configuration on Yuno's side, not a project on his."}
+  ];
+  const pl=$("#painList");
+  pains.forEach(p=>{
+    const det=document.createElement("details");det.className="pain";
+    const sum=document.createElement("summary");
+    const s1=document.createElement("span");s1.textContent=p.p;
+    const s2=document.createElement("span");s2.className="cost";s2.textContent=p.cost;
+    sum.appendChild(s1);sum.appendChild(s2);
+    const body=document.createElement("div");body.className="body";
+    [["What's broken",p.why,""],["Yuno's fix",p.sol,""],["The outcome",p.out,"o"]].forEach(([t,v,cls])=>{
+      const c=document.createElement("div");c.className="cell "+cls;
+      const tt2=document.createElement("div");tt2.className="t";tt2.textContent=t;
+      const vv=document.createElement("div");vv.textContent=v;
+      c.appendChild(tt2);c.appendChild(vv);body.appendChild(c);
+    });
+    det.appendChild(sum);det.appendChild(body);pl.appendChild(det);
+  });
+
+  // ---- Timeline ----
+  const plan=[
+    {d:"Days 1–7",m:"Discovery with Sofia: take-rate, method mix, chargeback data, PayU exit terms. SE assigned.",x:"MEDDICC gaps closed; data export agreed"},
+    {d:"Days 8–21",m:"Technical session with Marcus's team, run by Solutions Engineering. Sandbox live.",x:"Marcus neutral-to-positive"},
+    {d:"Days 15–30",m:"Financial model validated; proposal to Sofia + David together.",x:"Decision criteria include recovered revenue"},
+    {d:"Days 30–45",m:"Reference calls (Reserva, Livelo). Security & compliance review.",x:"Champion armed; no technical vetoes"},
+    {d:"Days 45–60",m:"Commercial negotiation and redlines; internal sign-off sequence runs.",x:"Verbal commit; contract in legal"},
+    {d:"Days 60–75",m:"Signature target — two-week buffer before day 89. Migration kickoff.",x:"Signed; integration started"},
+    {d:"Days 75–89",m:"Yuno live alongside PayU and Stripe; routing and fallback active.",x:"First orchestrated transactions before the deadline"}
+  ];
+  const tl=$("#timeline");
+  plan.forEach(p=>{
+    const ph=document.createElement("div");ph.className="ph";
+    const d1=document.createElement("div");d1.className="d";d1.textContent=p.d;
+    const d2=document.createElement("div");d2.className="m";d2.textContent=p.m;
+    const d3=document.createElement("div");d3.className="x";d3.textContent="Exit: "+p.x;
+    ph.appendChild(d1);ph.appendChild(d2);ph.appendChild(d3);tl.appendChild(ph);
+  });
+})();
+</script>
+</body>
+</html>
